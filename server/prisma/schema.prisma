@@ -1,0 +1,133 @@
+// MyVault — esquema do banco remoto.
+//
+// O servidor armazena apenas ciphertext e metadados mínimos de sincronização.
+// Não há colunas para título, usuário, URL, categoria ou qualquer conteúdo do
+// cofre: tudo isso está dentro de `encrypted_data`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(uuid()) @db.Uuid
+  email           String   @unique
+  /// Hash scrypt da senha da CONTA (não é a senha mestre do cofre).
+  passwordHash    String   @map("password_hash")
+  /// Contador monotônico usado como cursor de sincronização.
+  revisionCounter Int      @default(0) @map("revision_counter")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  devices        Device[]
+  sessions       Session[]
+  items          VaultItem[]
+  keyEnvelope    KeyEnvelope?
+  appliedChanges AppliedChange[]
+
+  @@map("users")
+}
+
+model Device {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  name       String
+  platform   String
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@index([userId])
+  @@map("devices")
+}
+
+model Session {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  deviceId      String    @map("device_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  revokedAt     DateTime? @map("revoked_at")
+  revokedReason String?   @map("revoked_reason")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device        Device         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId])
+  @@index([deviceId])
+  @@map("sessions")
+}
+
+/// Refresh tokens rotacionáveis. Só o hash SHA-256 é armazenado.
+/// Reuso de um token já consumido revoga a sessão inteira.
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  sessionId  String    @map("session_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  consumedAt DateTime? @map("consumed_at")
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("refresh_tokens")
+}
+
+/// Envelope da chave do cofre (cifrado com a chave derivada da senha mestre).
+model KeyEnvelope {
+  userId    String   @id @map("user_id") @db.Uuid
+  envelope  Json
+  version   Int
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("key_envelopes")
+}
+
+model VaultItem {
+  /// Gerado no cliente. A chave composta isola itens por usuário.
+  id            String   @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  /// ciphertext||tag em base64; nulo em tombstones.
+  encryptedData String?  @map("encrypted_data")
+  nonce         String?
+  cryptoVersion Int      @map("crypto_version")
+  /// Controle de concorrência otimista por registro.
+  version       Int
+  /// Revisão global do usuário no momento da última alteração.
+  revision      Int
+  deleted       Boolean  @default(false)
+  createdAt     DateTime @map("created_at")
+  updatedAt     DateTime @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, id])
+  @@unique([userId, revision])
+  @@map("vault_items")
+}
+
+/// Registro de alterações já aplicadas, para idempotência de reenvios.
+model AppliedChange {
+  changeId  String   @map("change_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  itemId    String   @map("item_id") @db.Uuid
+  version   Int
+  revision  Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, changeId])
+  @@index([createdAt])
+  @@map("applied_changes")
+}

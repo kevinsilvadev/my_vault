@@ -1,0 +1,21 @@
+name: vault_core
+description: >-
+  Lógica compartilhada do MyVault: modelos, derivação de chaves, criptografia,
+  regras do cofre e motor de sincronização. Dart puro (sem Flutter), testável
+  com `dart test`.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  # Implementações mantidas de Argon2id, AES-GCM e HMAC (puro Dart, funciona
+  # em Android e Windows). Ver docs/security.md, seção "Biblioteca".
+  cryptography: ^2.7.0
+  meta: ^1.15.0
+  uuid: ^4.5.1
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.8

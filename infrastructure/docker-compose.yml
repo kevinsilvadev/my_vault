@@ -1,0 +1,52 @@
+# MyVault — infraestrutura local.
+#
+# Uso:
+#   cp .env.example .env        # e preencha os segredos
+#   docker compose up -d db     # apenas PostgreSQL (API rodando localmente com `npm run dev`)
+#   docker compose --profile api up -d --build   # PostgreSQL + API em contêiner
+#
+# Portas publicadas apenas em 127.0.0.1. Em ambiente publicado, a API deve ficar
+# atrás de um proxy reverso com TLS (HTTPS obrigatório).
+name: myvault
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-myvault}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD em infrastructure/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-myvault}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    profiles: ["api"]
+    build:
+      context: ../server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-myvault}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-myvault}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET em infrastructure/.env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      REQUIRE_HTTPS: ${REQUIRE_HTTPS:-true}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+
+volumes:
+  db-data:

@@ -1,0 +1,31 @@
+# Segredos e ambiente
+.env
+.env.*
+!.env.example
+
+# Node / API
+server/node_modules/
+server/dist/
+server/coverage/
+
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+pubspec_overrides.yaml
+coverage/
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDEs e SO
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Dados locais (nunca versionar cofres ou bancos)
+*.db
+*.sqlite
+*.sqlite3

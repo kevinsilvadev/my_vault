@@ -1,0 +1,34 @@
+name: myvault
+description: MyVault — gerenciador de senhas pessoal (Android e Windows).
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  vault_core:
+    path: ../../packages/vault_core
+
+  # Armazenamento seguro do SO para o refresh token
+  # (Android Keystore / Windows DPAPI).
+  flutter_secure_storage: ^9.2.2
+  http: ^1.2.2
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  sqflite: ^2.4.1
+  # SQLite via FFI no Windows (o plugin sqflite cobre apenas Android/iOS/macOS).
+  sqflite_common_ffi: ^2.3.4
+  sqlite3_flutter_libs: ^0.5.28
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
